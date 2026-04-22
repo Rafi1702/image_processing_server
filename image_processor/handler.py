@@ -9,10 +9,8 @@ from base_response import KMeansResponse
 from typing import Tuple, List
 
 class ImageDataHandler(BaseHTTPRequestHandler):
-    def _process_kmeans(data_points: np.ndarray, k: int) -> KMeansResponse:
-        criteria: Tuple[int, int, float] = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-        
-        # 2. Jalankan K-Means
+    def _process_kmeans(self, data_points: np.ndarray, k: int):
+        criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 10, 1.0)
         ret, labels, centers = cv.kmeans(
             data_points, 
             k, 
@@ -21,12 +19,29 @@ class ImageDataHandler(BaseHTTPRequestHandler):
             10, 
             cv.KMEANS_PP_CENTERS
         )
-        return KMeansResponse(ret=ret, labels=labels.flatten().tolist(), centers=centers.tolist())
-    
-    def do_POST(self, data_points: List[int], k: int = 5):
-        data = self._process_kmeans(data_points = np.array(data_points, dtype=np.float32), k = k)
+        labels = labels.flatten().tolist(), 
 
-        return Util.send_data(self, data)
+        cv.gmm
+
+        # Kembalikan dictionary agar serializable ke JSON
+        return {
+            "ret": ret, 
+            "labelSize": len(labels[0]),
+            "labels": labels, 
+            "centers": centers.tolist()
+        }
+    
+    def do_POST(self):
+    # Kita definisikan cara memproses datanya di sini
+        def processor(json_data):
+            # Ambil 'points' dan 'k' dari JSON request body
+            # Contoh body: {"points": [[1,2], [3,4]], "k": 3}
+            points = np.array(json_data['points'], dtype=np.float32)
+            k_val = json_data.get('k', 50)
+            return self._process_kmeans(points, k_val)
+
+        # Panggil helper untuk handle pembacaan stream dan pengiriman respon
+        Util.send_data(self, processor)
 
 
 

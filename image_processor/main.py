@@ -12,7 +12,6 @@ def main():
     print(f"[*] HTTP Server mendengarkan di http://{host}:{port}")
     
     try:
-        # Menjalankan server selamanya
         httpd.serve_forever()
     except KeyboardInterrupt:
         print("\n[!] Server dimatikan.")
