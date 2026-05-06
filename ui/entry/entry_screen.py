@@ -70,6 +70,8 @@ class EntryScreen(Gtk.ApplicationWindow):
         button.set_state(ButtonParams(isLoading=True))
         await asyncio.sleep(3)
         button.set_state(ButtonParams(label=label, isLoading=False))
+    
+    
 
 def on_activate(app):
     # Create window
