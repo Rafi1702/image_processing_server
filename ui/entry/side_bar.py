@@ -5,7 +5,6 @@ class SideBar(Gtk.Box):
         super().__init__(orientation=Gtk.Orientation.VERTICAL)
         self.set_size_request(200, -1)
         self.set_hexpand(False)
-        self.add_css_class("background")
         self.is_collapsed = False
         
         # Header Box for Title and Toggle Button
@@ -14,6 +13,7 @@ class SideBar(Gtk.Box):
         header_box.set_margin_bottom(15)
         header_box.set_margin_start(10)
         header_box.set_margin_end(10)
+        
         
         # Toggle Button
         self.toggle_btn = Gtk.Button(icon_name="go-previous-symbolic")
@@ -35,10 +35,11 @@ class SideBar(Gtk.Box):
         image_button_content.append(Gtk.Label(label="Add Image"))
         image_button_content.append(Gtk.Box(hexpand=True))
         image_button_content.append(Gtk.Image.new_from_icon_name("document-save-symbolic"))
+    
 
         add_image_button = Gtk.Button()
         add_image_button.set_child(image_button_content)
-        add_image_button.connect("clicked", lambda x: print("Add Image"))
+        add_image_button.connect("clicked", self.find_image_from_file_system)
         self.append(add_image_button)
 
         # Scrolled window for content
@@ -75,7 +76,38 @@ class SideBar(Gtk.Box):
             self.scrolled_window.set_visible(True)
             self.set_size_request(200, -1)
             self.toggle_btn.set_icon_name("go-previous-symbolic")
+
+    def find_image_from_file_system(self, image_path: str):
+        dialog = Gtk.FileChooserDialog(
+            title="Please choose a folder",
+            action=Gtk.FileChooserAction.OPEN,
+            transient_for=self.get_root()
+        )
+        dialog.add_buttons(
+            "Cancel", Gtk.ResponseType.CANCEL, "Select", Gtk.ResponseType.OK
+        )
+        dialog.set_default_size(800, 400)
+
+        filter_img = Gtk.FileFilter()
+        filter_img.set_name("Semua Gambar")
+        filter_img.add_pattern("*.jpg")
+        filter_img.add_pattern("*.jpeg")
+        filter_img.add_pattern("*.png")
+        filter_img.add_pattern("*.JPG")
+        filter_img.add_pattern("*.PNG")
+        dialog.add_filter(filter_img)
+
+        dialog.connect("response", self.handle_folder_selection)
+        dialog.show()
         
+
+    def handle_folder_selection(self, dialog, response_id):
+        if response_id == Gtk.ResponseType.OK:
+            path = dialog.get_file().get_path()
+            print(f"Selected: {path}")
+        dialog.destroy()
+        
+
     def add_image(self, filename: str):
         list_row = Gtk.ListBoxRow()
         

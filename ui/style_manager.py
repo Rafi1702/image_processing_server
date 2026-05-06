@@ -4,6 +4,7 @@ from .barrel import *
 class StyleManager:
     _instance = None
     _provider = None
+    _all_styles = ""
 
     def __new__(cls):
         if cls._instance is None:
@@ -16,13 +17,27 @@ class StyleManager:
             )
         return cls._instance
 
-    def add_from_string(self, css_string: str):
-        """Add raw CSS text to the application"""
-        self._provider.load_from_data(css_string.encode())
+    @classmethod
+    def add_from_string(cls, css_string: str, className: str, widget: Gtk.Widget):
+        """Menghubungkan widget ke class CSS dan memuat style-nya"""
+        
+        # 1. Tambahkan class ke widget (hanya satu titik untuk selector CSS)
+        widget.add_css_class(className)
+        
+        # 2. Format CSS yang benar (Gunakan satu titik '.' untuk class selector)
+        # Tambahkan juga semicolon ';' jika lupa ditulis di parameter
+        new_css = f".{className} {{ {css_string}; }}\n"
+        
+        # 3. Simpan ke buffer agar CSS dari widget lain tidak hilang
+        cls._all_styles += new_css
+        
+        # 4. Muat ke provider
+        cls._provider.load_from_data(cls._all_styles.encode())
 
-    def add_from_file(self, file_path: str):
+    @classmethod
+    def add_from_file(cls, file_path: str):
         """Add CSS from a specific file path"""
-        self._provider.load_from_path(file_path)
+        cls._provider.load_from_path(file_path)
 
 # Create the single instance
 styles = StyleManager()

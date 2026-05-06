@@ -1,17 +1,22 @@
 
+from ui.style_manager import StyleManager
 from ..barrel import *
 from ui.widgets.button import Button, ButtonParams
 from ui.entry.side_bar import SideBar
+from ui.entry.widgets.image_placeholder import ImagePlaceholder
 import asyncio
 
 class EntryScreen(Gtk.ApplicationWindow):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.set_size_request(400, 400)
+        self.set_default_size(600, 500)
+
         vertical_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         vertical_box.set_hexpand(True)
         vertical_box.set_vexpand(True)
             
-        content_section = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        image_content_section = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10, vexpand=True, hexpand=True)
         button_action_section = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
 
         outlined_button = Button(label = "Stop", style="Outlined")
@@ -20,16 +25,26 @@ class EntryScreen(Gtk.ApplicationWindow):
         process_button = Button(label = "Process")
         process_button.connect("clicked", self.on_start_clicked)
 
-        button_action_section.append(process_button)    
-        content_section.append(Gtk.Label(label="Content"))
-        content_section.append(Gtk.Label(label="123"))
+        image_input_placeholder = ImagePlaceholder()
+        image_value_placeholder = ImagePlaceholder()
 
-        vertical_box.append(content_section)
+        button_action_section.append(process_button)
+
+        image_content_section.append(image_input_placeholder)
+        image_content_section.append(image_value_placeholder)
+        image_content_section.set_homogeneous(True)
+        
+        vertical_box.append(image_content_section)
         vertical_box.append(button_action_section)
 
         
         # Build the main layout
         main_layout = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        StyleManager.add_from_string(
+            css_string="background-color: green", 
+            className="green-content", 
+            widget=image_content_section
+        )   
         
         # Add sidebar to the left
         
@@ -41,9 +56,6 @@ class EntryScreen(Gtk.ApplicationWindow):
             "logo_design.svg"
         ])
         main_layout.append(self.side_bar)
-        
-        # Add the existing vertical content layout to the right
-        vertical_box.set_hexpand(True)
         main_layout.append(vertical_box)
 
         self.set_child(main_layout)

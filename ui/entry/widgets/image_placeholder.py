@@ -1,6 +1,13 @@
-# import gi
+from ...barrel import *
+from ui.widgets.button import Button, ButtonParams
+from ui.entry.side_bar import SideBar
+import asyncio
+from ui.style_manager import StyleManager
 
-# gi.require_version("Gtk", "4.0")
-# from gi.repository import Gtk
-
-# class 
+class ImagePlaceholder(Gtk.Box):
+    def __init__(self):
+        super().__init__()
+        self.set_size_request(200, 200)
+        
+        StyleManager.add_from_string(css_string="background-color: red", className="image-placeholder", widget=self)
+        self.show()
