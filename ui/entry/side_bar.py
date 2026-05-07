@@ -50,6 +50,7 @@ class SideBar(Gtk.Box):
         # List box for the images
         self.list_box = Gtk.ListBox()
         self.list_box.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        self.list_box.connect("row-selected", self.on_selected_changed)
         
         # Placeholder when empty
         empty_label = Gtk.Label(label="No images picked yet")
@@ -62,6 +63,27 @@ class SideBar(Gtk.Box):
         # Add some mock data to visualize
         for image in images:
             self.add_image(image)
+
+    def on_selected_changed(self, listbox, row):
+        if row is None:
+            return
+        
+        # Structure: ListBoxRow -> Box -> [Image, Label, Spacer, Button]
+        box = row.get_child()
+        if box is None:
+            return
+            
+        # The first child is the Image icon
+        icon = box.get_first_child()
+        if icon is None:
+            return
+            
+        # The second child is the Label
+        label = icon.get_next_sibling()
+        
+        if isinstance(label, Gtk.Label):
+            print(f"User memilih: {label.get_label()}")
+    
             
     def on_toggle_clicked(self, widget):
         self.is_collapsed = not self.is_collapsed

@@ -1,3 +1,5 @@
-.venv
-/my_project.egg-info
+venv
+build
 *__pycache__*
+data/history.json
+/image_processing_server.egg-info
