@@ -4,8 +4,13 @@ gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gio
 from ui.entry.entry_screen import on_activate
 from gi.events import GLibEventLoop
+from data.datasource.implementation.image_data_source_opencv_impl import ImageDataSourceOpenCvImpl
 
 async def run_app():
+
+    image_source = ImageDataSourceOpenCvImpl()
+
+    image_source.get_images("/Users/mbp/Desktop/image1.png")
     app = Gtk.Application(application_id="com.example.ImageProcessing", flags=Gio.ApplicationFlags.FLAGS_NONE)
     app.connect("activate", on_activate)
     

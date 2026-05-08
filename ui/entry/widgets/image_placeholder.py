@@ -11,6 +11,8 @@ class ImagePlaceholder(Gtk.Box):
         
         StyleManager.add_from_string(css_string="background-color: red", className="image-placeholder", widget=self)
         picture = Gtk.Picture.new_for_filename(imagePath)
+        picture.set_content_fit(Gtk.ContentFit.FILL)
+        picture.set_hexpand(True)
         self.append(picture)
         self.show()
     

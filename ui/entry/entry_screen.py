@@ -5,7 +5,7 @@ from ui.widgets.button import Button, ButtonParams
 from ui.entry.side_bar import SideBar
 from ui.entry.widgets.image_placeholder import ImagePlaceholder
 import asyncio
-from data.history_data_source import history_data_source
+from data.datasource.history_data_source import history_data_source
 
 class EntryScreen(Gtk.ApplicationWindow):
     def __init__(self, **kwargs):
@@ -28,8 +28,8 @@ class EntryScreen(Gtk.ApplicationWindow):
         process_button = Button(label = "Process")
         process_button.connect("clicked", self.on_start_clicked)
 
-        image_input_placeholder = ImagePlaceholder()
-        image_value_placeholder = ImagePlaceholder()
+        image_input_placeholder = ImagePlaceholder("/Users/mbp/Desktop/image1.png")
+        image_value_placeholder = ImagePlaceholder("/Users/mbp/Desktop/image2.png")
 
         button_action_section.append(process_button)
 
