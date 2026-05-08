@@ -5,12 +5,12 @@ from gi.repository import Gtk, Gio
 from ui.entry.entry_screen import on_activate
 from gi.events import GLibEventLoop
 from data.datasource.implementation.image_data_source_opencv_impl import ImageDataSourceOpenCvImpl
-
+from image_processor.graph_util import GraphBuilderOpenCv, Node
 async def run_app():
 
-    image_source = ImageDataSourceOpenCvImpl()
+    # image_source = ImageDataSourceOpenCvImpl()
 
-    image_source.get_images("/Users/mbp/Desktop/image1.png")
+    # image_source.get_images("/Users/mbp/Desktop/image1.png")
     app = Gtk.Application(application_id="com.example.ImageProcessing", flags=Gio.ApplicationFlags.FLAGS_NONE)
     app.connect("activate", on_activate)
     
@@ -32,12 +32,21 @@ async def run_app():
 
 def main():
     
-    loop = GLibEventLoop()
-    asyncio.set_event_loop(loop)
-    try:
-        loop.run_until_complete(run_app())
-    finally:
-        loop.close()
+    # loop = GLibEventLoop()
+    # asyncio.set_event_loop(loop)
+    # try:
+    #     loop.run_until_complete(run_app())
+    # finally:
+    #     loop.close()
+    
+    image_source = ImageDataSourceOpenCvImpl()
+
+    image_data = image_source.get_images("/Users/mbp/Desktop/image1.png")    
+    
+    graphBuilder = GraphBuilderOpenCv()
+
+    graphBuilder.build_graph(image_data.image, image_data.width, image_data.height)
+
 
 if __name__ == "__main__":
     main()
