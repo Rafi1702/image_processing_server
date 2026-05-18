@@ -6,6 +6,9 @@ from ui.entry.side_bar import SideBar
 from ui.entry.widgets.image_placeholder import ImagePlaceholder
 import asyncio
 from data.datasource.history_data_source import history_data_source
+from data.datasource.implementation.image_data_source_opencv_impl import ImageDataSourceOpenCvImpl
+from image_processor.graph_util import GraphBuilderOpenCv
+from worker import pool
 
 class EntryScreen(Gtk.ApplicationWindow):
     def __init__(self, **kwargs):
@@ -78,6 +81,10 @@ class EntryScreen(Gtk.ApplicationWindow):
         task.add_done_callback(lambda t: setattr(self, '_background_task', None))
 
     async def long_task(self, button):
+        if(not button.get_sensitive()):
+            print("button is not sensitive")
+            return
+
         original_label = button.get_label()
         
         try:
@@ -88,8 +95,25 @@ class EntryScreen(Gtk.ApplicationWindow):
             # Simulasi proses (Ganti dengan logika aiofiles atau I/O Anda)
             await asyncio.sleep(1)
 
-            await history_data_source.read_file()
+            loop = asyncio.get_running_loop()
+
+            image_source = ImageDataSourceOpenCvImpl()
+
+            image_data = image_source.get_images("/Users/mbp/Desktop/image1.png")    
             
+            graphBuilder = GraphBuilderOpenCv()
+            
+            # 2. Spin up the graph builder on a completely separate CPU core
+            graph_task = loop.run_in_executor(
+                    pool, 
+                    graphBuilder.build_graph, 
+                    image_data.image, 
+                    image_data.width, 
+                    image_data.height
+            )
+
+        
+            # await history_data_source.read_file()
             for img in history_data_source.images:
                 self.side_bar.add_image(img)
             

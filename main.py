@@ -1,11 +1,14 @@
+from image_processor.image_segmentation import GraphCutImageSegmentation, SegmentationBoundaryPoint
+from multiprocessing import Pool
 import gi
 import asyncio
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gio
 from ui.entry.entry_screen import on_activate
-from gi.events import GLibEventLoop
 from data.datasource.implementation.image_data_source_opencv_impl import ImageDataSourceOpenCvImpl
-from image_processor.graph_util import GraphBuilderOpenCv, Node
+from image_processor.graph_util import GraphBuilderOpenCv
+from threading import Thread
+
 async def run_app():
 
     # image_source = ImageDataSourceOpenCvImpl()
@@ -30,6 +33,12 @@ async def run_app():
     # Keep the async loop alive until the stop_event is set
     await stop_event.wait()
 
+
+async def async_range(count):
+    for i in range(count):
+        await asyncio.sleep(1)  # Simulate an async I/O operation
+        yield i
+               
 def main():
     
     # loop = GLibEventLoop()
@@ -38,15 +47,55 @@ def main():
     #     loop.run_until_complete(run_app())
     # finally:
     #     loop.close()
-    
+
+    # loop = asyncio.get_event_loop()
+
     image_source = ImageDataSourceOpenCvImpl()
 
     image_data = image_source.get_images("/Users/mbp/Desktop/image1.png")    
     
     graphBuilder = GraphBuilderOpenCv()
 
-    graphBuilder.build_graph(image_data.image, image_data.width, image_data.height)
+    graphBuilder.build_graph(image_data.image, image_data.width, image_data.height)    
 
+    graphBasedImageSegmentation = GraphCutImageSegmentation(graphBuilder)
+
+    fg_points = {SegmentationBoundaryPoint(image_data.width -2, image_data.height - 2)}
+    bg_points = {SegmentationBoundaryPoint(1, 1)}
+
+    print("fg_points: ", fg_points)
+    print("bg_points: ", bg_points)
+    
+    graphBasedImageSegmentation.segmentation(fg_boundary_points=fg_points, bg_boundary_points=bg_points)    
+    
+     
 
 if __name__ == "__main__":
     main()
+
+    
+    
+  # image_source = ImageDataSourceOpenCvImpl()
+
+    # image_data = image_source.get_images("/Users/mbp/Desktop/image1.png")    
+    
+    # graphBuilder = GraphBuilderOpenCv()
+    
+    
+    # loop = asyncio.get_running_loop()
+        
+    # # 2. Spin up the graph builder on a completely separate CPU core
+    # graph_task = loop.run_in_executor(
+    #         pool, 
+    #         graphBuilder.build_graph, 
+    #         image_data.image, 
+    #         image_data.width, 
+    #         image_data.height
+    #     )
+
+    # # 3. This loop now runs unhindered on the main CPU core
+    # async for value in async_range(30):
+    #     print(f"Received: {value}")
+
+    # # 4. Await the separate process execution to grab the final output
+    # graph_result = await graph_task

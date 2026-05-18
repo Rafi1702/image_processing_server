@@ -1,27 +1,24 @@
+from asyncio import coroutines
 from data.datasource import image_data_source
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import numpy as np
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
-
-T = TypeVar('T')
 
 directions = [[0, 1], [0, -1], [1, 0], [-1, 0]]
-@dataclass
-class Edge():
-    target_index: int
-    weight: float
 
 @dataclass
 class Node():
     index: int
     source_w: float
     sink_w: float
-    edges: list[Edge]
+    edges: list[int]
+    pixels: list[int] = field(default_factory=list[int]) 
 
-class GraphBuilder(Generic[T],ABC):
+class GraphBuilder[T](ABC):
     def __init__(self):
         self.nodes: list[Node] = []
+        self.image_width: int = 0
+        self.image_height: int = 0
 
     @abstractmethod
     def build_graph(self, source: T, image_width: int, image_height: int):
@@ -34,22 +31,28 @@ class GraphBuilderOpenCv(GraphBuilder[np.ndarray]):
         
 
     def build_graph(self, source: np.ndarray, image_width: int, image_height: int):
-        
+        self.image_width = image_width
+        self.image_height = image_height
+        #Sink Node        
         self.nodes.append(Node(-1, 0.0, 0.0, []))
 
         for row in range(image_height):
             for col in range(image_width):
                 pixel_id = (row * image_width + col)
-                self.nodes.append(Node(pixel_id, 0.0, 0.0, []))
+                source_color_idx = pixel_id * 4
+                source_r = source[source_color_idx]
+                source_g = source[source_color_idx + 1]
+                source_b = source[source_color_idx + 2]
+                self.nodes.append(Node(pixel_id, 0.0, 0.0, [],[source_r, source_g, source_b]))
 
-        
-# Node Sink
+        #Source Node
         self.nodes.append(Node((image_width * image_height)+1, 0.0, 0.0, []))
 
         for row in range(image_height):
             for col in range(image_width):
                 pixel_id = (row * image_width + col)
                 temporary_edges = []
+              
                 for direction in directions:
                     target_row = row + direction[0]
                     target_col = col + direction[1]
@@ -57,31 +60,19 @@ class GraphBuilderOpenCv(GraphBuilder[np.ndarray]):
                   
                     if target_row >= 0 and target_row < image_height and target_col >= 0 and target_col < image_width:
                         target_pixel_id = (target_row * image_width + target_col)
-                        target_color_idx = target_pixel_id * 4
-                        target_r = source[target_color_idx]
-                        target_g = source[target_color_idx + 1]
-                        target_b = source[target_color_idx + 2]
-                        
-                        edge = Edge(target_pixel_id, 0.0)
-                        temporary_edges.append(edge)
+                        temporary_edges.append(target_pixel_id)
                     
-                self.nodes[pixel_id].edges = temporary_edges 
+                self.nodes[pixel_id + 1].edges = temporary_edges 
             
-        source_edges = []
-        for i in range((image_width * image_height)):
-            source_edges.append(Edge(i, 0.0))
-
+        source_edges = list(range(image_width * image_height))
         self.nodes[0].edges = source_edges
 
-        sink_edges = []
-        for i in range((image_width * image_height)):
-            sink_edges.append(Edge(i, 0.0))
-        
+        sink_edges = list(range(image_width * image_height))
         self.nodes[(image_width * image_height)+1].edges = sink_edges                                      
                         
               
-
-        print("nodes: ", self.nodes[0].index)    
+        ##To access node dont forget to add 1 (because -1 is sink node)  
+        print("nodes: ", self.nodes[self.nodes[1].edges[0] + 1])    
 
 
 
