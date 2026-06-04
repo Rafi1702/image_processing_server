@@ -4,6 +4,7 @@ import gi
 import asyncio
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gio
+from gi.events import GLibEventLoopPolicy
 from ui.entry.entry_screen import on_activate
 from data.datasource.implementation.image_data_source_opencv_impl import ImageDataSourceOpenCvImpl
 from image_processor.graph_util import GraphBuilderOpenCv
@@ -40,33 +41,47 @@ async def async_range(count):
         yield i
                
 def main():
-    
-    # loop = GLibEventLoop()
-    # asyncio.set_event_loop(loop)
-    # try:
-    #     loop.run_until_complete(run_app())
-    # finally:
-    #     loop.close()
+
+    asyncio.set_event_loop_policy(GLibEventLoopPolicy())
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(run_app())
+    finally:
+        loop.close()
 
     # loop = asyncio.get_event_loop()
 
-    image_source = ImageDataSourceOpenCvImpl()
+    # image_source = ImageDataSourceOpenCvImpl()
 
-    image_data = image_source.get_images("/Users/mbp/Desktop/image1.png")    
+    # image_data = image_source.get_images("/Users/mbp/Desktop/image1.png")    
     
-    graphBuilder = GraphBuilderOpenCv()
+    # graphBuilder = GraphBuilderOpenCv(image_width= image_data.width, image_height= image_data.height, source=image_data.image)
 
-    graphBuilder.build_graph(image_data.image, image_data.width, image_data.height)    
+    # graphBuilder.build_graph()    
 
-    graphBasedImageSegmentation = GraphCutImageSegmentation(graphBuilder)
+    # fg_points = {
+    #     SegmentationBoundaryPoint(image_data.width - 2, image_data.height - 2),
+    #     SegmentationBoundaryPoint(image_data.width - 3, image_data.height - 2),
+    #     SegmentationBoundaryPoint(image_data.width - 2, image_data.height - 3),
+    #     SegmentationBoundaryPoint(image_data.width - 3, image_data.height - 3)
+    # }
 
-    fg_points = {SegmentationBoundaryPoint(image_data.width -2, image_data.height - 2)}
-    bg_points = {SegmentationBoundaryPoint(1, 1)}
+    # Membuat seed background dengan beberapa titik di pojok kiri atas
+    # offset = 5
 
-    print("fg_points: ", fg_points)
-    print("bg_points: ", bg_points)
+    # bg_points = {   
+    #     SegmentationBoundaryPoint(offset, offset),         
+    #     SegmentationBoundaryPoint(image_data.width - offset, offset),     
+    #     SegmentationBoundaryPoint(offset, image_data.height - offset),     
+    #     SegmentationBoundaryPoint(image_data.width - offset, image_data.height - offset)  
+    # }
+
+    # graphBasedImageSegmentation = GraphCutImageSegmentation(graphBuilder, fg_boundary_points=fg_points, bg_boundary_points=bg_points)
+
+    # print("fg_points: ", fg_points)
+    # print("bg_points: ", bg_points)
     
-    graphBasedImageSegmentation.segmentation(fg_boundary_points=fg_points, bg_boundary_points=bg_points)    
+    # graphBasedImageSegmentation.segmentation()    
     
      
 

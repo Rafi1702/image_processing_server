@@ -1,4 +1,3 @@
-from build.lib.data import history_data_source
 from ui.style_manager import StyleManager
 from ..barrel import *
 from ui.widgets.button import Button, ButtonParams
@@ -8,8 +7,8 @@ import asyncio
 from data.datasource.history_data_source import history_data_source
 from data.datasource.implementation.image_data_source_opencv_impl import ImageDataSourceOpenCvImpl
 from image_processor.graph_util import GraphBuilderOpenCv
-from worker import pool
-
+# from worker import pool
+from ui.widgets.canvas import Canvas
 class EntryScreen(Gtk.ApplicationWindow):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -33,13 +32,18 @@ class EntryScreen(Gtk.ApplicationWindow):
         process_button = Button(label = "Process")
         process_button.connect("clicked", self.on_start_clicked)
 
-        image_input_placeholder = ImagePlaceholder("/Users/mbp/Desktop/image1.png")
-        image_value_placeholder = ImagePlaceholder("/Users/mbp/Desktop/image2.png")
+        canvas_input = ImagePlaceholder("/Users/mbp/Desktop/car.jpeg")
+        canvas_value = ImagePlaceholder("/Users/mbp/Desktop/image2.png")
+
+        self.canvas_input = Canvas(content=canvas_input.picture, image_path="/Users/mbp/Desktop/car.jpeg")
+        self.canvas_value = Canvas(content=canvas_value.picture, image_path="/Users/mbp/Desktop/image2.png")
+        canvas_input.set_child(self.canvas_input)
+        canvas_value.set_child(self.canvas_value)
 
         button_action_section.append(process_button)
 
-        image_content_section.append(image_input_placeholder)
-        image_content_section.append(image_value_placeholder)
+        image_content_section.append(canvas_input)
+        image_content_section.append(canvas_value)
         image_content_section.set_homogeneous(True)
         
         vertical_box.append(image_content_section)
@@ -64,7 +68,7 @@ class EntryScreen(Gtk.ApplicationWindow):
         self.set_child(main_layout)
 
     def on_start_clicked(self, widget):
-        # 1. Cegah penumpukan task jika tombol diklik berkali-kali
+        # 1. Cegah penumpukan task jika tombol diklik berkali-kalis
         if self._background_task:
             return
 
@@ -81,12 +85,19 @@ class EntryScreen(Gtk.ApplicationWindow):
         task.add_done_callback(lambda t: setattr(self, '_background_task', None))
 
     async def long_task(self, button):
+        fg_seeds = self.canvas_input.fg_seeds
+        bg_seeds = self.canvas_input.bg_seeds
+        print(fg_seeds)
+        print(bg_seeds)
+        return 
+        
         if(not button.get_sensitive()):
             print("button is not sensitive")
             return
 
         original_label = button.get_label()
-        
+
+    
         try:
             # 4. Kunci UI agar user tahu proses sedang berjalan
             button.set_sensitive(False) 
@@ -99,13 +110,13 @@ class EntryScreen(Gtk.ApplicationWindow):
 
             image_source = ImageDataSourceOpenCvImpl()
 
-            image_data = image_source.get_images("/Users/mbp/Desktop/image1.png")    
+            image_data = image_source.get_images("/Users/mbp/Desktop/car.jpeg")    
             
             graphBuilder = GraphBuilderOpenCv()
             
             # 2. Spin up the graph builder on a completely separate CPU core
             graph_task = loop.run_in_executor(
-                    pool, 
+                    None, 
                     graphBuilder.build_graph, 
                     image_data.image, 
                     image_data.width, 

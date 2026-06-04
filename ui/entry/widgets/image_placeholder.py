@@ -3,6 +3,7 @@ from ui.widgets.button import Button, ButtonParams
 from ui.entry.side_bar import SideBar
 import asyncio
 from ui.style_manager import StyleManager
+from ui.widgets.canvas import Canvas
 
 class ImagePlaceholder(Gtk.AspectFrame):
     def __init__(self, imagePath: str = ""):
@@ -17,7 +18,10 @@ class ImagePlaceholder(Gtk.AspectFrame):
         picture = Gtk.Picture.new_for_filename(imagePath)
         picture.set_content_fit(Gtk.ContentFit.COVER)
         picture.set_hexpand(True)
-        self.set_child(picture)
+
+        self.picture = picture
+        
+
     
     
         
