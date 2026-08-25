@@ -13,7 +13,7 @@ class Node():
     index: int
     source_w: float
     sink_w: float
-    edges: list[int]
+    edges: list[int] = field(default_factory=list[int]) 
     pixels: list[int] = field(default_factory=list[int]) 
 
 class GraphBuilder[T](ABC):
@@ -90,3 +90,4 @@ class GraphBuilderOpenCv(GraphBuilder[np.ndarray]):
         print("width * height: ", self.image_width * self.image_height)
         print("last nodes: ", self.nodes[0].pixels)    
         # print("first nodes: ", self.nodes[0])    
+  

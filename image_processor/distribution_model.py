@@ -3,63 +3,66 @@ import numpy as np
 from sklearn.mixture import GaussianMixture
 
 class GaussianModel:
-    def __init__(self, source:np.ndarray, n_components:int = 2):
-        X_rgb = np.array([
-            [240,  50,  45],  # Kluster 1: Merah
-            [235,  62,  50],  
-            [220,  55,  40],  
-            [245,  70,  55],  
-            [210,  48,  38],  
-            [ 35, 180,  60],  # Kluster 2         : Hijau
-            [ 42, 195,  65],  
-            [ 50, 175,  55],  
-            [ 30, 160,  50],  
-            [ 45, 188,  70]   
-        ], dtype=np.float64)
+    def __init__(self, source: np.ndarray, n_components: int = 5):
+        # 1. Handle constraints on the number of samples
+        if source is None or len(source) == 0:
+            raise ValueError("Cannot train GMM with empty color source.")
+            
+        source = np.asarray(source, dtype=np.float64)
+        n_samples = source.shape[0]
 
-        # Bobot awal untuk masing-masing kluster (harus berupa array seukuran K)
-        init_weights = np.array([0.5, 0.5])
+        # 1. Tentukan jumlah komponen secara adaptif
+        # Komponen tidak boleh melebihi jumlah sampel yang ada
+        effective_components = min(n_components, n_samples)
+        
+        if n_samples < n_components * 2:
+            jitter = np.random.normal(0, 1e-3, size=source.shape)
+            source = source + jitter
 
-        # Tebakan pusat warna (Mean Vector) awal untu   k kluster 1 (Merah) dan kluster 2 (Hijau)
-        # Ukurannya harus (n_components, n_features) -> (2, 3)
-        init_means = np.array([
-            [230.0,  55.0,  45.0],  # Tebakan pusat Merah
-            [ 40.0, 180.0,  60.0]   # Tebakan pusat Hijau
-        ])
-
-        # Matriks Kovarians awal untuk tiap kluster (Menggunakan matriks diagonal / varians independen)
-        # Ukurannya harus (n_components, n_features, n_features) -> (2, 3, 3)
-        init_covariances = np.array([
-            [[100.0,   0.0,   0.0], [  0.0, 100.0,   0.0], [  0.0,   0.0, 100.0]], # Kovarians Kluster 1
-            [[100.0,   0.0,   0.0], [  0.0, 100.0,   0.0], [  0.0,   0.0, 100.0]]  # Kovarians Kluster 2
-        ])
-
-        # 3. Inisialisasi Model GMM dengan Parameter Dummy
-        # Kita set `covariance_type='full'` agar GMM bisa membentuk elips miring jika dibutuhkan
         self.model = GaussianMixture(
             n_components=n_components,
-            weights_init=init_weights,
-            means_init=init_means,
-            precisions_init=None, # Biarkan scikit-learn menghitung invers dari cov_init otomatis
             covariance_type='full',
             max_iter=100,
-            random_state=42 # Menjaga hasil tetap konsisten jika ada proses acak internal
+            reg_covar=1e-5,
+            random_state=42
         )
+            
+        # if n_components == 2:
+        #     init_weights = np.array([0.5, 0.5])
 
-        # Set matriks kovarians manual secara langsung ke parameter inisialisasi internal scikit-learn
-        # Catatan: scikit-learn membutuhkan parameter covariances dikirim lewat parameter init atau disuntikkan sebelum fit
-        self.model.covariances_init = init_covariances
+        #     # Tebakan pusat warna (Mean Vector) awal untuk kluster 1 (Merah) dan kluster 2 (Hijau)
+        #     init_means = np.array([
+        #         [230.0,  55.0,  45.0],  # Tebakan pusat Merah
+        #         [ 40.0, 180.0,  60.0]   # Tebakan pusat Hijau
+        #     ])
 
-        # 4. Latih Model menggunakan Data Dummy Anda
+        #     # Matriks Kovarians awal untuk tiap kluster
+        #     init_covariances = np.array([
+        #         [[100.0,   0.0,   0.0], [  0.0, 100.0,   0.0], [  0.0,   0.0, 100.0]], # Kovarians Kluster 1
+        #         [[100.0,   0.0,   0.0], [  0.0, 100.0,   0.0], [  0.0,   0.0, 100.0]]  # Kovarians Kluster 2
+        #     ])
+
+        #     self.model = GaussianMixture(
+        #         n_components=n_components,
+        #         weights_init=init_weights,
+        #         means_init=init_means,
+        #         precisions_init=None,
+        #         covariance_type='full',
+        #         max_iter=100,
+        #         reg_covar=1e-5,  # Add small regularization to avoid singular matrix errors
+        #         random_state=42
+        #     )
+        #     self.model.covariances_init = init_covariances
+        # else:
+        #     # For n_components != 2, use standard automatic k-means initialization
+       
+
+        # 3. Latih Model
         self.model.fit(source)
-
-        # # 5. Uji Coba Prediksi Kluster data baru (misal warna pink kemerahan)
-        # piksel_baru = np.array([[250, 60, 60]])
-        # hasil_kluster = self.model.predict(piksel_baru)
-        # probabilitas = self.model.predict_p                   roba(piksel_baru)
 
         print("means_", self.model.means_)
         print("covariances_", self.model.covariances_)
         print("weights_", self.model.weights_)
+
         
 # model = GaussianModel(source=None)

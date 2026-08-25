@@ -8,9 +8,9 @@ class Canvas(Gtk.Overlay):
         self.set_child(content)
         self.image_path = image_path
         self.cv_image = None
-        
-        self.strokes = []          # Completed strokes: [{'type': 'fg'/'bg', 'points': [(x, y)]}]
-        self.active_stroke = None  # Active stroke: {'type': 'fg'/'bg', 'points': [(x, y)]}
+        #Add Color to map on strokes
+        self.strokes = []          # Completed strokes: [{'type': 'fg'/'bg', 'points': [(x, y)], 'color': (r, g, b)}]
+        self.active_stroke = None  # Active stroke: {'type': 'fg'/'bg', 'points': [(x, y)], 'color': (r, g, b)}
         self.drag_start_x = 0.0
         self.drag_start_y = 0.0
 
@@ -66,7 +66,8 @@ class Canvas(Gtk.Overlay):
             ny = start_y / height
             self.active_stroke = {
                 'type': stroke_type,
-                'points': [(nx, ny)]
+                'points': [(nx, ny)],
+                'color': [] 
             }
             self.add_seed(nx, ny, stroke_type)
 
@@ -91,13 +92,19 @@ class Canvas(Gtk.Overlay):
             self.active_stroke = None
             self.drawing_area.queue_draw()
 
-    def on_click_released(self, gesture, n_press, x, y):
+    def on_click_released(self, n_press):
         if n_press == 2:  # Double click
-            self.strokes = []
-            self.fg_seeds.clear()
-            self.bg_seeds.clear()
-            print("[Canvas] Cleared all scribbles.")
-            self.drawing_area.queue_draw()
+            self.clear()
+
+
+
+    def clear(self):
+        self.strokes = []
+        self.fg_seeds.clear()
+        self.bg_seeds.clear()
+        print("[Canvas] Cleared all scribbles.")
+        self.drawing_area.queue_draw()
+
 
     def add_seed(self, nx, ny, stroke_type):
         if self.cv_image is not None:
@@ -109,12 +116,11 @@ class Canvas(Gtk.Overlay):
             color = self.cv_image[img_y, img_x]
             b, g, r = int(color[0]), int(color[1]), int(color[2])
             
-            
+            self.active_stroke['color'].append((r, g, b))
             
             # Log pixel mapping to console
             print(f"[{stroke_type.upper()} Scribble Point] Image: X={img_x}, Y={img_y} | RGB=({r}, {g}, {b})")
 
-            
             # Save coordinates
             if stroke_type == "fg":
                 self.fg_seeds.add((img_x, img_y))
@@ -176,6 +182,19 @@ class Canvas(Gtk.Overlay):
         cr.rectangle(box_x, box_y, box_w, box_h)
         cr.fill()
 
-        cr.set_source_rgba(1.0, 1.0, 1.0, 0.9)  # Soft white text
-        cr.move_to(box_x + 6, box_y + extents.height + 4)
         cr.show_text(text)
+
+    def clear_all_scribles(self):
+        self.clear()
+        
+    def update_image(self, image_path: str):
+        self.image_path = image_path
+        try:
+            import cv2 as cv
+            self.cv_image = cv.imread(image_path)
+            child = self.get_child()
+            if isinstance(child, Gtk.Picture):
+                child.set_filename(image_path)
+        except Exception as e:
+            print(f"Error updating image in Canvas: {e}")
+        self.drawing_area.queue_draw()

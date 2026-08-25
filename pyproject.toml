@@ -1,0 +1,21 @@
+[project]
+name = "image-processing-server"
+version = "0.1.0"
+description = "Image processing server with GTK 4, Scikit-Learn, OpenCV, and NumPy"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26.0",
+    "opencv-python>=4.8.0",
+    "scikit-learn>=1.3.0",
+    "scikit-image>=0.22.0",
+    "PyGObject>=3.46.0",
+    "aiofiles>=23.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
