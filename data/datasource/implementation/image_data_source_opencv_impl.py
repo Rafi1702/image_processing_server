@@ -16,16 +16,12 @@ class ImageDataSourceOpenCvImpl(ImageDataSource[ImageData]):
         img = cv.imread(imagePath, cv.IMREAD_UNCHANGED)
         if img is None: 
             raise Exception("Image not found")
-        # print("image: ", img)
-        # print("shape: ", img.shape)
-
-        ##assume the image is already bgra
-        #TODO: Create a check to check the image is bgra
 
         img_rgba = cv.cvtColor(img, cv.COLOR_BGRA2RGBA)
 
         return ImageData(img_rgba.flatten(), img.shape[1], img.shape[0])
 
+    
 
 
 

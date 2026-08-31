@@ -14,7 +14,7 @@ class ImagePlaceholder(Gtk.AspectFrame):
         self.set_xalign(0.5)
         self.set_yalign(0.5)
         self.set_obey_child(False)  
-        StyleManager.add_from_string(css_string="background-color: red", className="image-placeholder", widget=self)
+        StyleManager.add_from_string(css_string="background-color: none", className="image-placeholder", widget=self)
         picture = Gtk.Picture.new_for_filename(imagePath)
         picture.set_content_fit(Gtk.ContentFit.COVER)
         picture.set_hexpand(True)

@@ -11,34 +11,26 @@ from image_processor.graph_util import GraphBuilderOpenCv
 from image_processor.image_segmentation import GraphCutImageSegmentation, SegmentationBoundaryPoint
 from ui.widgets.canvas import Canvas
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+import traceback
+import sys
+
 
 image_path = "/Users/mbp/Desktop/roblox.png"
 
 
 def image_creation(image_data, fg_seeds, bg_seeds):
-    # original_label = button.get_label()
-    # 4. Instantiate graph builder with parameters
-    graphBuilder = GraphBuilderOpenCv(
-        image_width=image_data.width, 
-        image_height=image_data.height, 
-        source=image_data.image
-    )
-
-        # 6. Convert coordinate seeds to SegmentationBoundaryPoint objects
     fg_points = {SegmentationBoundaryPoint(x, y) for x, y in fg_seeds}
     bg_points = {SegmentationBoundaryPoint(x, y) for x, y in bg_seeds}
 
-        # 7. Perform Graph Cut segmentation (which trains GMM)
-    segmentation_processor = GraphCutImageSegmentation(
-        graph=graphBuilder, 
+    return GraphCutImageSegmentation(
+        image_data=image_data,
         fg_boundary_points=fg_points, 
-        bg_boundary_points=bg_points
-    )
-    segmentation_processor.segmentation()
+        bg_boundary_points=bg_points,
+    ).segmentation()
 
 class EntryScreen(Gtk.ApplicationWindow):
     
-    def __init__(self, **kwargs):
+    def __init__(self, image_data_source ,**kwargs,):
         super().__init__(**kwargs)
 
         self.worker = ProcessPoolExecutor(max_workers=1)
@@ -46,6 +38,7 @@ class EntryScreen(Gtk.ApplicationWindow):
         self._background_task = None
         self.set_size_request(400, 400)
         self.set_default_size(600, 500)
+        self.image_data_source = image_data_source
 
         vertical_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         vertical_box.set_hexpand(True)
@@ -88,14 +81,9 @@ class EntryScreen(Gtk.ApplicationWindow):
         
         # Build the main layout
         main_layout = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        StyleManager.add_from_string(
-            css_string="background-color: green", 
-            className="green-content", 
-            widget=image_content_section
-        )   
-        
+    
+    
         # Add sidebar to the left
-        
         self.side_bar = SideBar()
         
         main_layout.append(self.side_bar)
@@ -143,47 +131,44 @@ class EntryScreen(Gtk.ApplicationWindow):
             self._background_task = thread
             thread.start()    
         except Exception as e:
-            print(f"Error on process: {e}")
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+    
+   
+            tb = traceback.extract_tb(exc_traceback)[-1]
+            print(f"Error on process: {e} line: {tb.lineno}")
         
 
     def long_task(self, button, fg_seeds, bg_seeds):
         try:
             # 1. Load image using opencv data source
-            image_source = ImageDataSourceOpenCvImpl()
-            image_data = image_source.get_images(image_path)    
+            image_data = self.image_data_source.get_images(image_path)    
 
             future = self.worker.submit(
                 image_creation, image_data, fg_seeds, bg_seeds
             )
-            result = future.result()
-            
-            # # 2. Perform image creation / segmentation
-            # self._image_creation(image_data, fg_seeds, bg_seeds)
+            result_path = future.result() or "/Users/mbp/Desktop/output_image.png"
             
             # 3. Refresh canvas_value to display result
-            GLib.idle_add(self.canvas_value.update_image, image_path)
+            GLib.idle_add(self.canvas_value.update_image, result_path)
 
             self.canvas_value.clear_all_scribles()            
         except Exception as e:
             # GLib.idle_add(self._on_process_error, str(e))
-            print(f"Error saat eksekusi: {e}")
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+    
+   
+            tb = traceback.extract_tb(exc_traceback)[-1]
+            print(f"Error on process function_name: {tb.name} line: {tb.lineno}")
             
         finally:
             GLib.idle_add(self.cleanup_ui_after_task, button)
 
     def cleanup_ui_after_task(self, button):
         """This runs back on the MAIN UI thread to refresh visuals."""
-        # Refresh canvas_value to display result
-        self.canvas_value.update_image(image_path)
-    
         # Unlock UI elements
         button.set_sensitive(True)
         button.set_state(ButtonParams(isLoading=False, label=self.__process_button_label)) # Or reset to original label state
     
         return False # Returning False 
 
-def on_activate(app):   
-    # Create window
-    win = EntryScreen(application=app)
-    win.present()
-     
+

@@ -7,6 +7,8 @@ import numpy as np
 import cv2 as cv
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import maximum_flow, breadth_first_order
+from image_processor.graph_util import remove_duplicates, GraphBuilderOpenCv
+from .image_utils import compare_images
 
 @dataclass(frozen=True)
 class SegmentationBoundaryPoint:
@@ -23,39 +25,55 @@ class ImageSegmentation:
 
 
 class GraphBasedImageSegmentation(ImageSegmentation):
-    def __init__(self, graph: GraphBuilder):
+    def __init__(self, image_data):
         super().__init__() 
-        self.graph = graph 
+        self.graph =  graphBuilder = GraphBuilderOpenCv(
+            image_width=image_data.width, 
+            image_height=image_data.height, 
+            source=image_data.image
+        )
 
+    
     def segmentation(self):
         pass
 
 
 class GraphCutImageSegmentation(GraphBasedImageSegmentation):
-    def __init__(self, graph: GraphBuilder, fg_boundary_points: set[SegmentationBoundaryPoint], bg_boundary_points: set[SegmentationBoundaryPoint]):
-        super().__init__(graph) 
+    def __init__(self,image_data, fg_boundary_points: set[SegmentationBoundaryPoint], bg_boundary_points: set[SegmentationBoundaryPoint]):
+        super().__init__(image_data=image_data) 
+        
         self.fg_boundary_points = fg_boundary_points
         self.bg_boundary_points = bg_boundary_points
+
+        self.fg_pixels = self.__get_pixels_from_boundary(fg_boundary_points, self.graph)
+        self.bg_pixels = self.__get_pixels_from_boundary(bg_boundary_points, self.graph)
+
     
+    @staticmethod
+    def __get_pixels_from_boundary(boundary_points: set[SegmentationBoundaryPoint], graph):
+        pixels = []
+        for boundary_point in boundary_points:
+            pixel_index = boundary_point.y * graph.image_width + boundary_point.x
+            pixels.append(graph.nodes[pixel_index + 1].pixels)
+            
+        return pixels
+    
+
     def segmentation(self):
-
         graph = self.graph.nodes
-        fg_pixels = []
-        bg_pixels = []
-
-        for boundary_point in self.fg_boundary_points:
-            pixel_index = boundary_point.y * self.graph.image_width + boundary_point.x
-            fg_pixels.append(self.graph.nodes[pixel_index + 1].pixels)
-        for boundary_point in self.bg_boundary_points:
-            pixel_index = boundary_point.y * self.graph.image_width + boundary_point.x
-            bg_pixels.append(self.graph.nodes[pixel_index + 1].pixels)
-
-        if len(fg_pixels) == 0 or len(bg_pixels) == 0:
+        
+        if len(self.fg_pixels) == 0 or len(self.bg_pixels) == 0:
             print("[Segmentation Error] Both foreground and background scribbles are required.")
             return
+        
+        fg_sets = remove_duplicates(self.fg_pixels)
+        bg_sets = remove_duplicates(self.bg_pixels)
 
-        fg_distribution = GaussianModel(source=np.array(fg_pixels, dtype=np.float64), n_components=2)
-        bg_distribution = GaussianModel(source=np.array(bg_pixels, dtype=np.float64), n_components=2)
+        print(f"Shape of fg_sets = {np.array(fg_sets).shape}")
+        print(f"Shape of bg_sets = {np.array(bg_sets).shape}")
+
+        fg_distribution = GaussianModel(source=np.array(fg_sets, dtype=np.float64))
+        bg_distribution = GaussianModel(source=np.array(bg_sets, dtype=np.float64))
 
         H, W = self.graph.image_height, self.graph.image_width
         N = H * W
@@ -70,18 +88,21 @@ class GraphCutImageSegmentation(GraphBasedImageSegmentation):
         fg_scores = -fg_distribution.model.score_samples(all_colors)
         bg_scores = -bg_distribution.model.score_samples(all_colors)
         
-        print("fg_scores: ", fg_scores)
-        print("bg_scores: ", bg_scores)
-   
+        print(f'fg_scores: {fg_scores}, length: {len(fg_scores)}')
+        print(f'bg_scores: {bg_scores}, length: {len(bg_scores)}')
+        
         # 3. Setup Source (S=0) and Sink (T=V-1) t-link capacities
         source_w = bg_scores.copy()
         sink_w = fg_scores.copy()
 
         # Override for seed pixels
         large_val = 1e9
+
+        # Get actual index from user seeds/scribble 
         fg_seed_indices = [pt.y * W + pt.x for pt in self.fg_boundary_points]
         bg_seed_indices = [pt.y * W + pt.x for pt in self.bg_boundary_points]
 
+        #Set the new value for source and sink capacities for every pixel index 
         source_w[fg_seed_indices] = large_val
         sink_w[fg_seed_indices] = 0
 
@@ -90,14 +111,15 @@ class GraphCutImageSegmentation(GraphBasedImageSegmentation):
 
         # 4. Construct n-link capacities between adjacent pixels
         # Reshape to compute spatial differences
-        img_rgb = all_colors.reshape((H, W, 3))
+        num_channels = all_colors.shape[1] if all_colors.ndim > 1 else 1
+        img_colors = all_colors.reshape((H, W, num_channels))
         
-        # Horizontal differences: (H, W-1, 3)
-        diff_h = img_rgb[:, :-1, :] - img_rgb[:, 1:, :]
+        # Horizontal differences: (H, W-1, num_channels)
+        diff_h = img_colors[:, :-1, :] - img_colors[:, 1:, :]
         sq_diff_h = np.sum(diff_h ** 2, axis=2)
 
-        # Vertical differences: (H-1, W, 3)
-        diff_v = img_rgb[:-1, :, :] - img_rgb[1:, :, :]
+        # Vertical differences: (H-1, W, num_channels)
+        diff_v = img_colors[:-1, :, :] - img_colors[1:, :, :]
         sq_diff_v = np.sum(diff_v ** 2, axis=2)
 
         # Compute beta = 1 / (2 * mean(sq_diff))
@@ -176,15 +198,29 @@ class GraphCutImageSegmentation(GraphBasedImageSegmentation):
         mask = mask.reshape((H, W))
 
         # 8. Create cutout output and save
-        reconstructed_rgb = all_colors.reshape((H, W, 3)).astype(np.uint8)
-        reconstructed_bgr = cv.cvtColor(reconstructed_rgb, cv.COLOR_RGB2BGR)
+        reconstructed_img = all_colors.reshape((H, W, num_channels)).astype(np.uint8)
+        if num_channels == 4:
+            reconstructed_bgr = cv.cvtColor(reconstructed_img, cv.COLOR_RGBA2BGRA)
+        elif num_channels == 3:
+            reconstructed_bgr = cv.cvtColor(reconstructed_img, cv.COLOR_RGB2BGR)
+        else:
+            reconstructed_bgr = reconstructed_img
 
         segmented_img = np.zeros_like(reconstructed_bgr)
         segmented_img[mask == 255] = reconstructed_bgr[mask == 255]
 
         output_path = "/Users/mbp/Desktop/output_image.png"
         cv.imwrite(output_path, segmented_img)
-        print(f"[Segmentation] Saved segmented cutout to {output_path}")
+        
+        if self.graph.original_source.size == segmented_img.size:
+            orig_converted = cv.cvtColor(
+                self.graph.original_source.reshape((H, W, num_channels)).astype(np.uint8),
+                cv.COLOR_RGBA2BGRA if num_channels == 4 else cv.COLOR_RGB2BGR
+            ) if num_channels in (3, 4) else self.graph.original_source.reshape(segmented_img.shape)
+            
+            print(f"Compared Images Value: {compare_images(orig_converted, segmented_img)}")
+
+        return output_path
 
 
 class ThresholdingImageSegmentation(ImageSegmentation):

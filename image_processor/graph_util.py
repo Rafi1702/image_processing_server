@@ -7,6 +7,14 @@ from abc import ABC, abstractmethod
 directions = [[0, 1], [0, -1], [1, 0], [-1, 0]]
 
 
+def remove_duplicates(list):
+    copy = []
+    for e in list:
+        if e not in copy:
+            copy.append(e)    
+    
+    return copy
+
 #Actually, Node index and list of nodes index is different due to adding source and sink node (Soon it will be change or deprecated)
 @dataclass
 class Node():
@@ -30,25 +38,30 @@ class GraphBuilder[T](ABC):
 class GraphBuilderOpenCv(GraphBuilder[np.ndarray]):
     def __init__(self, image_width: int, image_height: int, source:np.ndarray):
         super().__init__(image_width, image_height)
+        self._source = source
         #Source Node        
         self.nodes.append(Node(-1, 0.0, 0.0, []))
         
+        num_pixels = self.image_width * self.image_height
+        num_channels = source.size // num_pixels if num_pixels > 0 else 4
+
         for row in range(self.image_height):
             for col in range(self.image_width):
                 pixel_id = (row * self.image_width + col)
-                source_color_idx = pixel_id * 4
-                source_r = source[source_color_idx]
-                source_g = source[source_color_idx + 1]
-                source_b = source[source_color_idx + 2]
-                self.nodes.append(Node(pixel_id, 0.0, 0.0, [],[source_r, source_g, source_b]))
+                source_color_idx = pixel_id * num_channels
+                pixel_color = source[source_color_idx : source_color_idx + num_channels].tolist()
+                self.nodes.append(Node(pixel_id, 0.0, 0.0, [], pixel_color))
 
-        
         ##todo add sink node
         self.nodes.append(Node(self.image_width * self.image_height, 0.0, 0.0, []))
 
     def __add_bidirectional_edge(self, edge_1, edge_2):
         self.nodes[edge_1].edges.append(edge_2)
         self.nodes[edge_2].edges.append(edge_1)
+
+    @property
+    def original_source(self) -> np.ndarray : 
+        return self._source
 
     #Source and Sink Node is at index 0 and len(nodes)
     def build_graph(self):
@@ -89,5 +102,3 @@ class GraphBuilderOpenCv(GraphBuilder[np.ndarray]):
         print("len nodes: ", len(self.nodes))    
         print("width * height: ", self.image_width * self.image_height)
         print("last nodes: ", self.nodes[0].pixels)    
-        # print("first nodes: ", self.nodes[0])    
-  

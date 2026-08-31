@@ -5,16 +5,12 @@ import asyncio
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gio
 from gi.events import GLibEventLoopPolicy
-from ui.entry.entry_screen import on_activate
+from ui.entry.entry_screen import EntryScreen
 from data.datasource.implementation.image_data_source_opencv_impl import ImageDataSourceOpenCvImpl
 from image_processor.graph_util import GraphBuilderOpenCv
 from threading import Thread
 
 async def run_app():
-
-    # image_source = ImageDataSourceOpenCvImpl()
-
-    # image_source.get_images("/Users/mbp/Desktop/image1.png")
     app = Gtk.Application(application_id="com.example.ImageProcessing", flags=Gio.ApplicationFlags.FLAGS_NONE)
     app.connect("activate", on_activate)
     
@@ -48,7 +44,13 @@ def main():
         loop.run_until_complete(run_app())
     finally:
         loop.close()
-    
+
+
+def on_activate(app):   
+    # Create window
+    win = EntryScreen(application=app, image_data_source=ImageDataSourceOpenCvImpl())
+    win.present()
+     
      
 
 if __name__ == "__main__":
