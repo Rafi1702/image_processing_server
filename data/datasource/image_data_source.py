@@ -6,7 +6,7 @@ T = TypeVar('T')
 
 class ImageDataSource(Generic[T],ABC):
     @abstractmethod
-    def get_images(self, imagePath: str) -> T:
+    def get_images(self, image_path: str) -> T:
         pass
 
 

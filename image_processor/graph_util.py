@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 
 directions = [[0, 1], [0, -1], [1, 0], [-1, 0]]
 
-
 def remove_duplicates(list):
     copy = []
     for e in list:

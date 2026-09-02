@@ -1,57 +1,36 @@
 from image_processor.image_segmentation import GraphCutImageSegmentation, SegmentationBoundaryPoint
-from multiprocessing import Pool
 import gi
-import asyncio
+import sys
 gi.require_version('Gtk', '4.0')
 from gi.repository import Gtk, Gio
 from gi.events import GLibEventLoopPolicy
 from ui.entry.entry_screen import EntryScreen
-from data.datasource.implementation.image_data_source_opencv_impl import ImageDataSourceOpenCvImpl
-from image_processor.graph_util import GraphBuilderOpenCv
+from data.datasource.implementation.image_data_source_opencv_impl import ImageDataSourceOpenCvImpl, ImageDataSourcePilImpl
+
 from threading import Thread
 
-async def run_app():
-    app = Gtk.Application(application_id="com.example.ImageProcessing", flags=Gio.ApplicationFlags.FLAGS_NONE)
+def run_app():
+    app = Gtk.Application(application_id="com.example.ImageProcessing")
     app.connect("activate", on_activate)
-    
-    # Register and activate the application without blocking
-    app.register(None)
-    app.activate()
-    
-    # Create an event to keep the asyncio loop running until all windows are closed
-    stop_event = asyncio.Event()
-    
-    def on_window_removed(app, window):
-        if not app.get_windows():
-            stop_event.set()
-            
-    app.connect("window-removed", on_window_removed)
-    
-    # Keep the async loop alive until the stop_event is set
-    await stop_event.wait()
-
-
-async def async_range(count):
-    for i in range(count):
-        await asyncio.sleep(1)  # Simulate an async I/O operation
-        yield i
+    return app.run(sys.argv)
                
 def main():
-
-    asyncio.set_event_loop_policy(GLibEventLoopPolicy())
-    loop = asyncio.get_event_loop()
-    try:
-        loop.run_until_complete(run_app())
-    finally:
-        loop.close()
-
+    try: 
+        run_app()
+    except Exception as e: 
+        print(f"Failed to start app {e}")
+    
 
 def on_activate(app):   
     # Create window
-    win = EntryScreen(application=app, image_data_source=ImageDataSourceOpenCvImpl())
+    win = app.get_active_window()
+    if not win:
+        win = EntryScreen(
+            application=app, image_data_source=ImageDataSourcePilImpl()
+        )
+
     win.present()
      
-     
-
+    
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

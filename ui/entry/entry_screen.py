@@ -15,7 +15,8 @@ import traceback
 import sys
 
 
-image_path = "/Users/mbp/Desktop/roblox.png"
+# image_path = "/Users/mbp/Desktop/OtherProjects/image_processing_server/image_processor/roblox.png"
+image_path = "/Users/mbp/Desktop/dummy_image.jpg"
 
 
 def image_creation(image_data, fg_seeds, bg_seeds):
@@ -32,7 +33,6 @@ class EntryScreen(Gtk.ApplicationWindow):
     
     def __init__(self, image_data_source ,**kwargs,):
         super().__init__(**kwargs)
-
         self.worker = ProcessPoolExecutor(max_workers=1)
         self.images = []
         self._background_task = None
@@ -60,29 +60,22 @@ class EntryScreen(Gtk.ApplicationWindow):
         clear_button = Button(label="Clear")
         clear_button.connect("clicked", self.on_clear_button_clicked)
 
-        # canvas_input = ImagePlaceholder("/Users/mbp/Desktop/car.jpeg")
         canvas_value = ImagePlaceholder(image_path)
-
-        # self.canvas_input = Canvas(content=canvas_input.picture, image_path="/Users/mbp/Desktop/car.jpeg")
         self.canvas_value = Canvas(content=canvas_value.picture, image_path=image_path)
-        # canvas_input.set_child(self.canvas_input)
+
         canvas_value.set_child(self.canvas_value)
 
         button_action_section.append(self.process_button)
         button_action_section.append(clear_button)
-
-        # image_content_section.append(canvas_input)
         image_content_section.append(canvas_value)
+
         image_content_section.set_homogeneous(True)
-        
         vertical_box.append(image_content_section)
         vertical_box.append(button_action_section)
 
-        
         # Build the main layout
         main_layout = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-    
-    
+
         # Add sidebar to the left
         self.side_bar = SideBar()
         
@@ -90,18 +83,27 @@ class EntryScreen(Gtk.ApplicationWindow):
         main_layout.append(vertical_box)
 
         self.set_child(main_layout)
+        self.connect("unmap",self._on_widget_destroyed)
 
+
+    def _cleanup_worker(self):
+        if self.worker:
+            # cancel_futures=True discards any pending work in the queue
+            # wait=False stops Python from waiting on completion
+            self.worker.shutdown(wait=False, cancel_futures=True)
+            self.worker = None
     
-    def cleanup():
-        #clean something
-        raise NotImplementedError("This needs to be implemented")
+    def _on_widget_destroyed(self):        
+        return self._cleanup_worker
 
+    def __del__(self):
+        return self._cleanup_worker
+    
     def on_clear_button_clicked(self, button):
         self.canvas_value.clear_all_scribles()
 
 
     def on_start_clicked(self, widget):
-
         button = self.process_button
 
         if self._background_task and self._background_task.is_alive():
@@ -132,43 +134,34 @@ class EntryScreen(Gtk.ApplicationWindow):
             thread.start()    
         except Exception as e:
             exc_type, exc_value, exc_traceback = sys.exc_info()
-    
-   
+            
+
             tb = traceback.extract_tb(exc_traceback)[-1]
             print(f"Error on process: {e} line: {tb.lineno}")
         
-
+        
     def long_task(self, button, fg_seeds, bg_seeds):
-        try:
-            # 1. Load image using opencv data source
-            image_data = self.image_data_source.get_images(image_path)    
+          # 1. Load image using opencv data source
+        image_data = self.image_data_source.get_images(image_path)    
 
-            future = self.worker.submit(
-                image_creation, image_data, fg_seeds, bg_seeds
-            )
-            result_path = future.result() or "/Users/mbp/Desktop/output_image.png"
-            
-            # 3. Refresh canvas_value to display result
-            GLib.idle_add(self.canvas_value.update_image, result_path)
+        future = self.worker.submit(
+            image_creation, image_data, fg_seeds, bg_seeds
+        )
+        
+        future.add_done_callback(self._on_future_completed)
 
-            self.canvas_value.clear_all_scribles()            
-        except Exception as e:
-            # GLib.idle_add(self._on_process_error, str(e))
-            exc_type, exc_value, exc_traceback = sys.exc_info()
+
+    def _on_future_completed(self, future):
+        updated_image = future.result() or "/Users/mbp/Desktop/output_image2.png"
+
+        GLib.idle_add(self._on_ui_updated, updated_image)
     
-   
-            tb = traceback.extract_tb(exc_traceback)[-1]
-            print(f"Error on process function_name: {tb.name} line: {tb.lineno}")
-            
-        finally:
-            GLib.idle_add(self.cleanup_ui_after_task, button)
-
-    def cleanup_ui_after_task(self, button):
-        """This runs back on the MAIN UI thread to refresh visuals."""
-        # Unlock UI elements
-        button.set_sensitive(True)
-        button.set_state(ButtonParams(isLoading=False, label=self.__process_button_label)) # Or reset to original label state
+    def _on_ui_updated(self, updated_image):
+        self.canvas_value.update_image(updated_image)
+        self.process_button.set_sensitive(True)
+        self.process_button.set_state(ButtonParams(isLoading=False, label=self.__process_button_label)) # Or reset to original label state
+        self.canvas_value.clear_all_scribles()     
     
-        return False # Returning False 
+         
 
 

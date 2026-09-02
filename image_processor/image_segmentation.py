@@ -1,6 +1,5 @@
 
 from dataclasses import dataclass
-from image_processor.graph_util import GraphBuilder
 from abc import ABC, abstractmethod
 from image_processor.distribution_model import GaussianModel
 import numpy as np
@@ -47,6 +46,8 @@ class GraphCutImageSegmentation(GraphBasedImageSegmentation):
 
         self.fg_pixels = self.__get_pixels_from_boundary(fg_boundary_points, self.graph)
         self.bg_pixels = self.__get_pixels_from_boundary(bg_boundary_points, self.graph)
+        self.all_colors = np.array([node.pixels for node in self.graph.nodes[1:-1]], dtype=np.float64)
+        self.num_channels = self.all_colors.shape[1] if self.all_colors.ndim > 1 else 1
 
     
     @staticmethod
@@ -59,60 +60,23 @@ class GraphCutImageSegmentation(GraphBasedImageSegmentation):
         return pixels
     
 
-    def segmentation(self):
-        graph = self.graph.nodes
-        
-        if len(self.fg_pixels) == 0 or len(self.bg_pixels) == 0:
-            print("[Segmentation Error] Both foreground and background scribbles are required.")
-            return
-        
-        fg_sets = remove_duplicates(self.fg_pixels)
-        bg_sets = remove_duplicates(self.bg_pixels)
+    ## THIS METHOD IS TIGHT TO NUMPY
+    def __construct_n_link(self, W: int, H:int):
+        # Strip Alpha channel and normalize colors to [0, 1] for N-link diffs
+        colors_rgb = self.all_colors[:, :3] if self.all_colors.ndim > 1 and self.all_colors.shape[1] > 3 else self.all_colors
+        if colors_rgb.max() > 1.0:
+            colors_rgb = colors_rgb / 255.0
+            
+        img_colors = colors_rgb.reshape((H, W, colors_rgb.shape[1]))
 
-        print(f"Shape of fg_sets = {np.array(fg_sets).shape}")
-        print(f"Shape of bg_sets = {np.array(bg_sets).shape}")
+        def assembly_vectors(grid_h: int, grid_w: int, full_w: int, offset: int):
+            y_indices, x_indices = np.ogrid[:grid_h, :grid_w]
+            p1 = y_indices * full_w + x_indices
+            p2 = p1 + offset
+            u = p1.flatten() + 1  
+            v = p2.flatten() + 1
+            return u, v
 
-        fg_distribution = GaussianModel(source=np.array(fg_sets, dtype=np.float64))
-        bg_distribution = GaussianModel(source=np.array(bg_sets, dtype=np.float64))
-
-        H, W = self.graph.image_height, self.graph.image_width
-        N = H * W
-        V = N + 2
-
-        # 1. Gather all pixel colors
-        all_colors = np.array([node.pixels for node in self.graph.nodes[1:-1]], dtype=np.float64)
-
-        print("all_colors shape: ", all_colors.shape)
-        # 2. Compute GMM log likelihoods (scores)
-        # score_samples returns log-likelihood. Negative log-likelihood is our cost.
-        fg_scores = -fg_distribution.model.score_samples(all_colors)
-        bg_scores = -bg_distribution.model.score_samples(all_colors)
-        
-        print(f'fg_scores: {fg_scores}, length: {len(fg_scores)}')
-        print(f'bg_scores: {bg_scores}, length: {len(bg_scores)}')
-        
-        # 3. Setup Source (S=0) and Sink (T=V-1) t-link capacities
-        source_w = bg_scores.copy()
-        sink_w = fg_scores.copy()
-
-        # Override for seed pixels
-        large_val = 1e9
-
-        # Get actual index from user seeds/scribble 
-        fg_seed_indices = [pt.y * W + pt.x for pt in self.fg_boundary_points]
-        bg_seed_indices = [pt.y * W + pt.x for pt in self.bg_boundary_points]
-
-        #Set the new value for source and sink capacities for every pixel index 
-        source_w[fg_seed_indices] = large_val
-        sink_w[fg_seed_indices] = 0
-
-        source_w[bg_seed_indices] = 0
-        sink_w[bg_seed_indices] = large_val
-
-        # 4. Construct n-link capacities between adjacent pixels
-        # Reshape to compute spatial differences
-        num_channels = all_colors.shape[1] if all_colors.ndim > 1 else 1
-        img_colors = all_colors.reshape((H, W, num_channels))
         
         # Horizontal differences: (H, W-1, num_channels)
         diff_h = img_colors[:, :-1, :] - img_colors[:, 1:, :]
@@ -128,31 +92,72 @@ class GraphCutImageSegmentation(GraphBasedImageSegmentation):
             mean_sq_diff = 1e-5
         beta = 1.0 / (2.0 * mean_sq_diff)
 
-        # Compute capacities w = gamma * exp(-beta * sq_diff)
-        gamma = 50.0
+        gamma = 10.0
         w_h = gamma * np.exp(-beta * sq_diff_h)
         w_v = gamma * np.exp(-beta * sq_diff_v)
 
-        # Vectorized assembly of horizontal neighbors
-        y_indices_h, x_indices_h = np.ogrid[:H, :W-1]
-        p1_h = y_indices_h * W + x_indices_h
-        p2_h = p1_h + 1
-        u_h = p1_h.flatten() + 1
-        v_h = p2_h.flatten() + 1
-        weight_h = w_h.flatten()
 
-        # Vectorized assembly of vertical neighbors
-        y_indices_v, x_indices_v = np.ogrid[:H-1, :W]
-        p1_v = y_indices_v * W + x_indices_v
-        p2_v = p1_v + W
-        u_v = p1_v.flatten() + 1
-        v_v = p2_v.flatten() + 1
+        u_h, v_h = assembly_vectors(grid_h=H, grid_w=W-1, full_w=W, offset=1)
+        u_v, v_v = assembly_vectors(grid_h=H-1, grid_w=W, full_w=W, offset=W)
+        weight_h = w_h.flatten()
         weight_v = w_v.flatten()
 
-        # Symmetrical n-links
         u_neighbors = np.concatenate([u_h, v_h, u_v, v_v])
         v_neighbors = np.concatenate([v_h, u_h, v_v, u_v])
         weight_neighbors = np.concatenate([weight_h, weight_h, weight_v, weight_v])
+
+        return u_neighbors, v_neighbors, weight_neighbors
+    
+    def __construct_t_link(self, W):
+        LARGE_VAL = 1000.0
+        fg_sets = self.fg_pixels
+        bg_sets = self.bg_pixels
+
+        print(f"Shape of fg_sets = {np.array(fg_sets).shape}")
+        print(f"Shape of bg_sets = {np.array(bg_sets).shape}")
+
+        # Model creation for object/fg and background/bg
+        fg_distribution = GaussianModel(source=np.array(fg_sets, dtype=np.float64))
+        bg_distribution = GaussianModel(source=np.array(bg_sets, dtype=np.float64))
+
+        # Compute log likelihoods ln P(x | FG) and ln P(x | BG)
+        log_p_fg = fg_distribution.log_likelihood(self.all_colors)
+        log_p_bg = bg_distribution.log_likelihood(self.all_colors)
+
+        # Log-Likelihood Ratio: delta = ln P(x|FG) - ln P(x|BG)
+        diff_log = log_p_fg - log_p_bg
+
+        # Scale factor to balance T-link likelihood ratio with N-link smoothness
+        lambda_t = 5.0
+        source_w = np.maximum(0, lambda_t * diff_log)
+        sink_w = np.maximum(0, lambda_t * (-diff_log))
+
+        fg_seed_indices = [pt.y * W + pt.x for pt in self.fg_boundary_points]
+        bg_seed_indices = [pt.y * W + pt.x for pt in self.bg_boundary_points]
+
+        source_w[fg_seed_indices] = LARGE_VAL
+        sink_w[fg_seed_indices] = 0
+
+        source_w[bg_seed_indices] = 0
+        sink_w[bg_seed_indices] = LARGE_VAL
+
+        return source_w, sink_w
+    
+    def segmentation(self):
+        graph = self.graph.nodes
+        all_colors = self.all_colors
+
+        H, W = self.graph.image_height, self.graph.image_width
+        N = H * W
+        V = N + 2
+
+        if len(self.fg_pixels) == 0 or len(self.bg_pixels) == 0:
+            print("[Segmentation Error] Both foreground and background scribbles are required.")
+            return
+        
+
+        source_w, sink_w = self.__construct_t_link(W)
+        u_neighbors, v_neighbors, weight_neighbors = self.__construct_n_link(W= W, H= H)
 
         # S-link: 0 -> pixel (node index: pixel_id + 1)
         u_source = np.zeros(N, dtype=np.int32)
@@ -198,10 +203,10 @@ class GraphCutImageSegmentation(GraphBasedImageSegmentation):
         mask = mask.reshape((H, W))
 
         # 8. Create cutout output and save
-        reconstructed_img = all_colors.reshape((H, W, num_channels)).astype(np.uint8)
-        if num_channels == 4:
+        reconstructed_img = all_colors.reshape((H, W, self.num_channels)).astype(np.uint8)
+        if self.num_channels == 4:
             reconstructed_bgr = cv.cvtColor(reconstructed_img, cv.COLOR_RGBA2BGRA)
-        elif num_channels == 3:
+        elif self.num_channels == 3:
             reconstructed_bgr = cv.cvtColor(reconstructed_img, cv.COLOR_RGB2BGR)
         else:
             reconstructed_bgr = reconstructed_img
@@ -209,17 +214,17 @@ class GraphCutImageSegmentation(GraphBasedImageSegmentation):
         segmented_img = np.zeros_like(reconstructed_bgr)
         segmented_img[mask == 255] = reconstructed_bgr[mask == 255]
 
-        output_path = "/Users/mbp/Desktop/output_image.png"
+        output_path = "/Users/mbp/Desktop/output_image2.png"
         cv.imwrite(output_path, segmented_img)
         
-        if self.graph.original_source.size == segmented_img.size:
-            orig_converted = cv.cvtColor(
-                self.graph.original_source.reshape((H, W, num_channels)).astype(np.uint8),
-                cv.COLOR_RGBA2BGRA if num_channels == 4 else cv.COLOR_RGB2BGR
-            ) if num_channels in (3, 4) else self.graph.original_source.reshape(segmented_img.shape)
-            
-            print(f"Compared Images Value: {compare_images(orig_converted, segmented_img)}")
 
+        orig_converted = cv.cvtColor(
+                self.graph.original_source.reshape((H, W, self.num_channels)).astype(np.uint8),
+                cv.COLOR_RGBA2BGRA if self.num_channels == 4 else cv.COLOR_RGB2BGR
+        ) if self.num_channels in (3, 4) else self.graph.original_source.reshape(segmented_img.shape)
+
+        print(f"Compared Images Value: {compare_images(orig_converted, segmented_img)}")    
+        
         return output_path
 
 
