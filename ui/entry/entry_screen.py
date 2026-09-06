@@ -15,8 +15,8 @@ import traceback
 import sys
 
 
-# image_path = "/Users/mbp/Desktop/OtherProjects/image_processing_server/image_processor/roblox.png"
-image_path = "/Users/mbp/Desktop/dummy_image.jpg"
+image_path = "/Users/mbp/Desktop/OtherProjects/image_processing_server/image_processor/roblox.png"
+# image_path = "/Users/mbp/Desktop/dummy_image.jpg"
 
 
 def image_creation(image_data, fg_seeds, bg_seeds):

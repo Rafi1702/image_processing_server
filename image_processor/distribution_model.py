@@ -40,8 +40,28 @@ class GaussianModel:
 
         return self.model.score_samples(X)
 
-    def score_samples(self, X: np.ndarray) -> np.ndarray:
-        return -self.log_likelihood(X)
+    # def score_samples(self, X: np.ndarray) -> np.ndarray:
+    #     return -self.log_likelihood(X)
 
 
+class GaussianMixtureScratch:
+    def __init__(self, components: int, user_seeds: np.ndarray):
+        self.clusters = []
+        self.covariance = []
+        self.mean = 0
+        for i in range(components):
+            clusters.append([])
 
+        
+        
+    @property
+    def mean(self): return self.mean
+
+    @property
+    def covariance(self): return self.covariance
+
+    def __move_cluster(self):
+        raise NotImplementedError()
+    
+    def __assign_point(self):
+        raise NotImplementedError()

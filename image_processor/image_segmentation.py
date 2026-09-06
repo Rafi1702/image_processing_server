@@ -6,7 +6,7 @@ import numpy as np
 import cv2 as cv
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import maximum_flow, breadth_first_order
-from image_processor.graph_util import remove_duplicates, GraphBuilderOpenCv
+from image_processor.graph_util import GraphBuilderOpenCv
 from .image_utils import compare_images
 
 @dataclass(frozen=True)
@@ -26,7 +26,7 @@ class ImageSegmentation:
 class GraphBasedImageSegmentation(ImageSegmentation):
     def __init__(self, image_data):
         super().__init__() 
-        self.graph =  graphBuilder = GraphBuilderOpenCv(
+        self.graph = GraphBuilderOpenCv(
             image_width=image_data.width, 
             image_height=image_data.height, 
             source=image_data.image
