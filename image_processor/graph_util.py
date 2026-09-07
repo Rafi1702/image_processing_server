@@ -62,13 +62,25 @@ class GraphBuilderOpenCv(GraphBuilder):
         print("width * height: ", self.image_width * self.image_height)
         print("last nodes: ", self.nodes[0].pixels)    
 
+
+
 class GraphBuilderFlatten(GraphBuilder):
+
+    """ 
+    Parameters:
+    image_source (numpy array): the original image buffer
+    pixel_format (int): the length representing 1 pixel, Ex. (RGB = 3) (RGBA = 4)
+    """
     def __init__(self, image_width: int, image_height: int, image_source,  pixel_format:int = 4) :
         super().__init__(image_height=image_height, image_width=image_width)
         self.pixel_format = pixel_format
         self.image_source = image_source
         self.copy = self.build_graph()
     
+    """ The method that create a graph 
+    Parameters:
+    additional_nodes (int) = the additional node, in this case the algorithm (max-flow min-cut) need 2 additional nodes (Source and Sink)
+    """
     def build_graph(self, additional_nodes: int = 2,):
         total_nodes = self.pixel_format + (self.pixel_format + additional_nodes)
         n = self.image_width * self.image_height
@@ -77,7 +89,11 @@ class GraphBuilderFlatten(GraphBuilder):
                 else self.image_source[(x // total_nodes) * self.pixel_format + (x % total_nodes)] 
                 for x in range(2*total_nodes)]
 
+    """The method to assign calculated weight
+    Parameters:
+    source_weight (float) = the weight from the source to the pixel
+    """
     def assign_weight_value(self, source_weight: float = 0.0, sink_weight: float = 0.0, neigbor_weights: list[float] = [0.0,0.0,0.0,0.0]):
-            
+        something = None   
         raise NotImplementedError()
     
